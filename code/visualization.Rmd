@@ -150,7 +150,7 @@ ecotox_data <- ecotox %>%
             sd = sd(conc_1_mean_standardized, na.rm = TRUE) * 1e6)
 ```
 
-LOEC
+LOEC data
 
 ```{r, warning = FALSE, message = FALSE}
 loec <- read_excel(here('data', 'loec.xlsx')) %>% 
