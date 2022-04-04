@@ -103,16 +103,20 @@ ggplot(data = total_pfas, aes(x = compound, y = concentration)) +
 ### Concentration Data - Global WWTP
 
 ```{r}
+### excel sheet names
 sheets_1 <- excel_sheets(here('data', 'pfa_global_wwtp.xlsx'))
 
+### read in excel sheet as a list
 conc_data_global <- lapply(sheets_1, function(x) {
   read_excel(here('data', 'pfa_global_wwtp.xlsx'), sheet = x)})
 
+### influent data
 influent <- conc_data_global[[1]] %>% 
   pivot_longer(netfosaa:pfuna,
                names_to = 'compound',
                values_to = 'concentration')
 
+### effluent data
 effluent <- conc_data_global[[2]] %>% 
   pivot_longer(netfosaa:pfuna,
                names_to = 'compound',
@@ -120,6 +124,7 @@ effluent <- conc_data_global[[2]] %>%
 ```
 
 ```{r}
+### test visualizations
 ggplot(data = influent, aes(x = compound, y = concentration)) +
   geom_boxplot(outlier.shape = 4) +
   theme_minimal()
@@ -133,6 +138,7 @@ ggplot(data = effluent, aes(x = compound, y = concentration)) +
 
 EC50/LC50
 ```{r}
+### read in the ecotox info
 ecotox <- read_excel(here('data', 'ecotoxdata.xlsx')) %>% 
   janitor::clean_names() %>% 
   separate(chemical_name, 
@@ -187,7 +193,7 @@ plot1_data <- rbind(total_pfas_1, influent_1, effluent_1)
 ggplot() +
   geom_boxplot(data = plot1_data, aes(x = compound, y = concentration, fill = source), 
                outlier.shape = 4, position = position_dodge2(preserve = "single"), width = .75) +
-  geom_point(data = ecotox_final, aes(x = compound, y = concentration, color = endpoint)) +
+  geom_point(data = ecotox_final, aes(x = compound, y = concentration, color = endpoint), shape = 1) +
   geom_errorbar(data = ecotox_final, aes(x = compound, ymin = concentration - sd, ymax = concentration + sd, color = endpoint), width = 0) +
   theme_minimal() +
   scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
@@ -197,7 +203,7 @@ ggplot() +
   theme(legend.position = 'top',
         legend.key.size = unit(0.4, 'cm'),
         legend.background = element_rect(fill = "white", color = "black"),
-        legend.text = element_text(size = 7),
+        legend.text = element_text(size = 8),
         legend.title = element_blank())
 ``` 
 
