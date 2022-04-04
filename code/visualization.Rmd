@@ -1,0 +1,203 @@
+---
+title: "Data Wrangling and Visualization"
+author: "Taylor Medina"
+date: "4/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(readxl)
+```
+
+### Concentraton Data - KRT
+
+```{r}
+### excel sheet names
+sheets <- excel_sheets(here('data', 'pfa_concentration_data_krt.xlsx'))
+
+### read in excel as a list
+conc_data_all <- lapply(sheets, function(x) {
+  read_excel(here('data', 'pfa_concentration_data_krt.xlsx'), sheet = x)})
+
+### extract each region and store as a dataframe
+lompoc <- conc_data_all[[1]] %>% 
+  janitor::clean_names() %>% 
+  mutate(netfosaa = n_et_fosaa,
+         pfuna = pf_un_a,
+         pftrda = pf_tr_da)
+  
+pasorobles <- conc_data_all[[2]] %>% 
+  mutate(netfosaa = NEtFOSAA...2,
+         nmefosaa = NEtFOSAA...13) %>% 
+  janitor::clean_names() %>% 
+  mutate(pftrda = pf_tr_da)
+
+camrosa <- conc_data_all[[3]] %>% 
+  janitor::clean_names() %>% 
+  mutate(pfhpa = pf_hp_a,
+         pfhxa = pf_hx_a,
+         pfuna = pf_un_a,
+         pfhxs = pf_hx_s,
+         pftrda = pf_tr_da,
+         nmefosaa = n_me_fosaa)
+
+whittier <- conc_data_all[[4]]
+vannuys <- conc_data_all[[5]]
+
+rest <- conc_data_all[[6]] %>% 
+  t() %>% 
+  janitor::row_to_names(row_number = 1) %>% 
+  as.data.frame() %>% 
+  na_if('-')
+```
+
+```{r}
+### combine dataframes based on specific compound
+netfosaa <- rbind(pasorobles[14], vannuys[2], lompoc[14], rest[1]) %>% 
+  drop_na()
+pfda <- rbind(pasorobles[3], camrosa[3], vannuys[3], whittier[3], lompoc[8], rest[2]) %>% 
+  drop_na()
+pfhpa <- rbind(pasorobles[4], camrosa[15], vannuys[4], whittier[4], lompoc[5], rest[3]) %>% 
+  drop_na()
+pfhxa <- rbind(pasorobles[5], camrosa[16], vannuys[5], whittier[5], lompoc[4], rest[4]) %>% 
+  drop_na()
+pfoa <- rbind(pasorobles[6], camrosa[6], vannuys[6], whittier[6], lompoc[2], rest[5]) %>% 
+  drop_na()
+pfos <- rbind(pasorobles[7], camrosa[7], vannuys[7], whittier[7], lompoc[3], rest[6]) %>% 
+  drop_na()
+pfuna <- rbind(pasorobles[8], camrosa[17], vannuys[8], whittier[8], lompoc[15], rest[7]) %>% 
+  drop_na()
+pfbs <- rbind(camrosa[10], rest[8]) %>% 
+  drop_na()
+pfhxs <- rbind(pasorobles[10], camrosa[18], vannuys[9], whittier[9], rest[9]) %>% 
+  drop_na()
+pfta <- rbind(pasorobles[11], camrosa[13], vannuys[11], lompoc[11], rest[13]) %>% 
+  drop_na()
+pftrda <- rbind(pasorobles[16], camrosa[19], vannuys[12], whittier[11], lompoc[16], rest[14]) %>% 
+  drop_na()
+nmefosaa <- rbind(pasorobles[15], camrosa[20], whittier[12], rest[12]) %>% 
+  drop_na()
+pfna <- rest[10] %>% 
+  drop_na()
+```
+
+```{r}
+### bind all of the columns together
+total_pfas <- bind_rows(netfosaa, pfda, pfhpa, pfhxa, pfoa, pfos, pfuna, pfbs, pfhxs, pfta, pftrda, nmefosaa, pfna) %>% 
+  pivot_longer(cols = netfosaa:pfna,
+               names_to = 'compound',
+               values_to = 'concentration') %>% 
+  drop_na() %>% 
+  mutate(concentration = as.numeric(concentration))
+
+### test visualization 
+ggplot(data = total_pfas, aes(x = compound, y = concentration)) +
+  geom_boxplot(outlier.shape = 4) +
+  theme_minimal()
+```
+
+### Concentration Data - Global WWTP
+
+```{r}
+sheets_1 <- excel_sheets(here('data', 'pfa_global_wwtp.xlsx'))
+
+conc_data_global <- lapply(sheets_1, function(x) {
+  read_excel(here('data', 'pfa_global_wwtp.xlsx'), sheet = x)})
+
+influent <- conc_data_global[[1]] %>% 
+  pivot_longer(netfosaa:pfuna,
+               names_to = 'compound',
+               values_to = 'concentration')
+
+effluent <- conc_data_global[[2]] %>% 
+  pivot_longer(netfosaa:pfuna,
+               names_to = 'compound',
+               values_to = 'concentration')
+```
+
+```{r}
+ggplot(data = influent, aes(x = compound, y = concentration)) +
+  geom_boxplot(outlier.shape = 4) +
+  theme_minimal()
+
+ggplot(data = effluent, aes(x = compound, y = concentration)) +
+  geom_boxplot(outlier.shape = 4) +
+  theme_minimal()
+```
+
+### EcoTox Data
+
+EC50/LC50
+```{r}
+ecotox <- read_excel(here('data', 'ecotoxdata.xlsx')) %>% 
+  janitor::clean_names() %>% 
+  separate(chemical_name, 
+           into = c('compound', 'extra'), sep = ' ') %>% 
+  mutate(conc_1_mean_standardized = as.numeric(conc_1_mean_standardized),
+         endpoint = case_when(
+           endpoint == 'LC50/' ~ 'LC50',
+           endpoint == 'EC50/' ~ 'EC50',
+           TRUE ~ endpoint),
+         compound = str_to_lower(compound))
+
+ecotox_data <- ecotox %>% 
+  group_by(compound, endpoint) %>% 
+  summarize(concentration = mean(conc_1_mean_standardized, na.rm = TRUE) * 1e6,
+            sd = sd(conc_1_mean_standardized, na.rm = TRUE) * 1e6)
+```
+
+LOEC
+
+```{r, warning = FALSE, message = FALSE}
+loec <- read_excel(here('data', 'loec.xlsx')) %>% 
+  janitor::clean_names() %>% 
+  separate(chemical_name, 
+           into = c('compound', 'extra'), sep = ' ') %>% 
+  mutate(conc_1_mean_standardized = as.numeric(conc_1_mean_standardized),
+         compound = str_to_lower(compound)) %>% 
+  filter(endpoint == 'LOEC')
+
+loec_data <- loec %>% 
+  group_by(compound) %>% 
+  summarize(concentration = mean(conc_1_mean_standardized, na.rm = TRUE) * 1e6,
+            sd = sd(conc_1_mean_standardized, na.rm = TRUE) * 1e6) %>% 
+  mutate(endpoint = 'LOEC')
+
+ecotox_final <- rbind(ecotox_data, loec_data)
+```
+
+
+
+### Plot 1: Combining Field Data + Literature Inf/Eff Data
+
+```{r}
+total_pfas_1 <- total_pfas %>% 
+  mutate(source = 'Sample Data')
+influent_1 <- influent %>% 
+  mutate(source = 'Global Influent Data')
+effluent_1 <- effluent %>% 
+  mutate(source = 'Global Effluent Data')
+
+plot1_data <- rbind(total_pfas_1, influent_1, effluent_1)
+
+ggplot() +
+  geom_boxplot(data = plot1_data, aes(x = compound, y = concentration, fill = source), 
+               outlier.shape = 4, position = position_dodge2(preserve = "single"), width = .75) +
+  geom_point(data = ecotox_final, aes(x = compound, y = concentration, color = endpoint)) +
+  geom_errorbar(data = ecotox_final, aes(x = compound, ymin = concentration - sd, ymax = concentration + sd, color = endpoint), width = 0) +
+  theme_minimal() +
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+              labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  labs(x = 'chemical',
+       y = 'concentration (ng/L)') +
+  theme(legend.position = 'top',
+        legend.key.size = unit(0.4, 'cm'),
+        legend.background = element_rect(fill = "white", color = "black"),
+        legend.text = element_text(size = 7),
+        legend.title = element_blank())
+``` 
+
