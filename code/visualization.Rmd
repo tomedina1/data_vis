@@ -176,6 +176,46 @@ loec_data <- loec %>%
 ecotox_final <- rbind(ecotox_data, loec_data)
 ```
 
+ECOSAR Data - missing from Ecotox
+
+```{r}
+
+chemicals <- c('netfosaa', 'netfosaa', 'nmefosaa', 'nmefosaa', 'pfhxs', 'pftrda', 'pftrda', 'pfdoa', 'pfta')
+endpoints <-  c('LC50', 'EC50', 'LC50', 'EC50', 'LC50', 'LC50', 'EC50', 'LC50', 'LC50')
+means <- as.numeric(
+    c(
+      mean(c(0.83, 0.42, 1.54, 0.37)) * 1e6,
+      0.47 * 1e6,
+      mean(c(1.95, 1.08, 3.35, 0.69)) * 1e6,
+      0.92 * 1e6,
+      mean(c(301.32, 190.35, 381.97, 129.77)) * 1e6,
+      0.02 * 1e6,
+      0.13 * 1e6,
+      mean(c(0.06, 0.06, 0.08)) * 1e6,
+      0.01 * 1e6))
+sds <- as.numeric(
+     c(
+      sd(c(0.83, 0.42, 1.54, 0.37)) * 1e6,
+      0,
+      sd(c(1.95, 1.08, 3.35, 0.69)) * 1e6,
+      0,
+      sd(c(301.32, 190.35, 381.97, 129.77)) * 1e6,
+      0,
+      0,
+      sd(c(0.06, 0.06, 0.08)) * 1e6,
+      0))
+
+ecosar_data <- cbind(chemicals, endpoints, means, sds) %>% 
+  as.data.frame() %>% 
+  mutate(means = as.numeric(means),
+         sds = as.numeric(sds))
+
+colnames(ecosar_data) <- c('compound', 'endpoint', 'concentration', 'sd') 
+
+toxicity_final <- rbind(ecotox_final, ecosar_data)
+```
+
+
 
 
 ### Plot 1: Combining Field Data + Literature Inf/Eff Data
@@ -190,20 +230,76 @@ effluent_1 <- effluent %>%
 
 plot1_data <- rbind(total_pfas_1, influent_1, effluent_1)
 
+### editing the names of the compounds to uppercase
+plot1_data <- plot1_data %>% 
+  mutate(compound = str_to_upper(compound),
+         compound = case_when(
+           compound == 'NMEFOSAA' ~ 'NMeFOSAA',
+           compound == 'NETFOSAA' ~ 'NEtFOSAA',
+           compound == 'PFDOA' ~ 'PFDoA',
+           compound == 'PFHPA' ~ 'PFHpA',
+           compound == 'PFHXA' ~ 'PFHxS',
+           compound == 'PFTRDA' ~ 'PFTrDA',
+           compound == 'PFUNA' ~ 'PFUnA',
+           TRUE ~ compound))
+
+toxicity_final <- toxicity_final %>% 
+  mutate(compound = str_to_upper(compound),
+         compound = case_when(
+           compound == 'NMEFOSAA' ~ 'NMeFOSAA',
+           compound == 'NETFOSAA' ~ 'NEtFOSAA',
+           compound == 'PFDOA' ~ 'PFDoA',
+           compound == 'PFHPA' ~ 'PFHpA',
+           compound == 'PFHXA' ~ 'PFHxS',
+           compound == 'PFTRDA' ~ 'PFTrDA',
+           compound == 'PFUNA' ~ 'PFUnA',
+           TRUE ~ compound))
+
+toxicity_colors <- c(')
+``` 
+
+```{r}
 ggplot() +
   geom_boxplot(data = plot1_data, aes(x = compound, y = concentration, fill = source), 
                outlier.shape = 4, position = position_dodge2(preserve = "single"), width = .75) +
-  geom_point(data = ecotox_final, aes(x = compound, y = concentration, color = endpoint), shape = 1) +
-  geom_errorbar(data = ecotox_final, aes(x = compound, ymin = concentration - sd, ymax = concentration + sd, color = endpoint), width = 0) +
+  geom_point(data = toxicity_final, aes(x = compound, y = concentration, color = endpoint), shape = 1, size = 2) +
+  geom_errorbar(data = toxicity_final, aes(x = compound, ymin = concentration - sd, ymax = concentration + sd, color = endpoint), width = 0) +
+  scale_color_manual(values = c('black', 'darkorange1')) +
   theme_minimal() +
   scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
               labels = scales::trans_format("log10", scales::math_format(10^.x))) +
   labs(x = 'chemical',
        y = 'concentration (ng/L)') +
-  theme(legend.position = 'top',
+  theme(text = element_text(size = 8),
+        legend.position = 'top',
         legend.key.size = unit(0.4, 'cm'),
         legend.background = element_rect(fill = "white", color = "black"),
         legend.text = element_text(size = 8),
         legend.title = element_blank())
-``` 
+```
+
+### Plot 2 - No LOEC
+
+```{r}
+toxicity_final_1 <- toxicity_final %>% 
+  filter(endpoint != 'LOEC')
+
+ggplot() +
+  geom_boxplot(data = plot1_data, aes(x = compound, y = concentration, fill = source), 
+               outlier.shape = 4, position = position_dodge2(preserve = "single"), width = .75) +
+  geom_point(data = toxicity_final_1, aes(x = compound, y = concentration, color = endpoint), shape = 1, size = 2) +
+  geom_errorbar(data = toxicity_final_1, aes(x = compound, ymin = concentration - sd, ymax = concentration + sd, color = endpoint), width = 0) +
+  scale_color_manual(values = c('black', 'darkorange1')) +
+  theme_minimal() +
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+              labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  labs(x = 'chemical',
+       y = 'concentration (ng/L)') +
+  theme(text = element_text(size = 8),
+        legend.position = 'top',
+        legend.key.size = unit(0.4, 'cm'),
+        legend.background = element_rect(fill = "white", color = "black"),
+        legend.text = element_text(size = 8),
+        legend.title = element_blank())
+```
 
