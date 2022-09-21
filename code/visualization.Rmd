@@ -150,6 +150,10 @@ ecotox <- read_excel(here('data', 'ecotoxdata.xlsx')) %>%
            TRUE ~ endpoint),
          compound = str_to_lower(compound))
 
+ecotox_sum <- ecotox %>% 
+  group_by(compound, endpoint) %>% 
+  summarize(sum = n())
+
 ecotox_data <- ecotox %>% 
   group_by(compound, endpoint) %>% 
   summarize(concentration = mean(conc_1_mean_standardized, na.rm = TRUE) * 1e6,
@@ -166,6 +170,10 @@ loec <- read_excel(here('data', 'loec.xlsx')) %>%
   mutate(conc_1_mean_standardized = as.numeric(conc_1_mean_standardized),
          compound = str_to_lower(compound)) %>% 
   filter(endpoint == 'LOEC')
+
+loec_sum <- loec %>% 
+  group_by(compound) %>% 
+  summarize(count = n())
 
 loec_data <- loec %>% 
   group_by(compound) %>% 
@@ -271,12 +279,15 @@ ggplot() +
               labels = scales::trans_format("log10", scales::math_format(10^.x))) +
   labs(x = 'chemical',
        y = 'concentration (ng/L)') +
-  theme(text = element_text(size = 8),
+  theme(text = element_text(size = 8, face = 'bold'),
         legend.position = 'top',
         legend.key.size = unit(0.4, 'cm'),
         legend.background = element_rect(fill = "white", color = "black"),
         legend.text = element_text(size = 8),
-        legend.title = element_blank())
+        legend.title = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())
 ```
 
 ### Plot 2 - No LOEC
@@ -302,5 +313,20 @@ ggplot() +
         legend.background = element_rect(fill = "white", color = "black"),
         legend.text = element_text(size = 8),
         legend.title = element_blank())
+```
+
+## Counts
+
+```{r}
+counts <- plot1_data %>% 
+  drop_na() %>% 
+  group_by(compound, source) %>% 
+  summarize(count = n())
+
+write.csv(counts, 'counts_figure.csv')
+
+toxicity_counts <- toxicity_final_1 %>% 
+  group_by(compound, endpoint) %>% 
+  summarize(count = n())
 ```
 
